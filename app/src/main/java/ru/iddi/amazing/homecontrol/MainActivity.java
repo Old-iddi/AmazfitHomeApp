@@ -13,6 +13,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.Button;
 import android.widget.TextView;
@@ -33,41 +34,49 @@ import android.net.wifi.WifiManager;
 
 public class MainActivity extends AppCompatActivity {
 
-    public static MainActivity ma;
-
     private Spinner spinner, zoom;
     private Button wifion, wifioff, lighton, lightoff;
     private URL urlOn, urlOff;
+    private ProgressBar progress;
     private WifiManager wifi;
     private ArrayList<ArrayList<String>> switches;
 
     public void wifiGoesOn () {
-        wifion.setEnabled(false);
-        wifioff.setEnabled(true);
-        lighton.setEnabled(true);
-        lightoff.setEnabled(true);
+        if( wifion.isEnabled() == true ) {
+            wifion.setEnabled(false);
+            wifioff.setEnabled(true);
+            lighton.setEnabled(true);
+            lightoff.setEnabled(true);
+            this.progress.setVisibility(ProgressBar.INVISIBLE);
+        }
     }
 
     public void wifiGoesOff () {
-        wifion.setEnabled(true);
-        wifioff.setEnabled(true);
-        lighton.setEnabled(false);
-        lightoff.setEnabled(false);
+        if( wifioff.isEnabled()==true ) {
+            wifion.setEnabled(true);
+            wifioff.setEnabled(false);
+            lighton.setEnabled(false);
+            lightoff.setEnabled(false);
+            this.progress.setVisibility(ProgressBar.INVISIBLE);
+        }
    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        ma = this;
+        //ma = this;
         setContentView(R.layout.activity_main);
 
         wifi = (WifiManager)this.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+
+        this.progress = findViewById(R.id.progressBar);
 
         this.wifion = findViewById(R.id.wifion);
         this.wifion.setOnClickListener( new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 MainActivity.this.wifi.setWifiEnabled(true);
+                MainActivity.this.progress.setVisibility(ProgressBar.VISIBLE);
             }
         });
 
@@ -76,8 +85,8 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 MainActivity.this.wifi.setWifiEnabled(false);
-               wifiGoesOff();
-            }
+                MainActivity.this.progress.setVisibility(ProgressBar.VISIBLE);
+             }
         });
 
         this.lighton = findViewById(R.id.lighton);
@@ -113,23 +122,10 @@ public class MainActivity extends AppCompatActivity {
         });
         setSpinnerAdapter(switches);
 
-        ConnectivityManager conMan = (ConnectivityManager) this.getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
-        try {
-            NetworkInfo netInfo = conMan.getActiveNetworkInfo();
-            if (netInfo != null && netInfo.getType() == ConnectivityManager.TYPE_WIFI) {
-                wifiGoesOn();
-            } else {
-                wifiGoesOff();
-            }
-        }
-        catch (NullPointerException npe) {
-            wifiGoesOff();;
-        }
-
         WifiReceiver wifirec = new WifiReceiver();
-        wifirec.mainActivity = this;
-        registerReceiver( wifirec, new IntentFilter("android.net.conn.CONNECTIVITY_CHANGE"));
-
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
+        registerReceiver( wifirec, filter );
     }
 
     private void getURL( URL inUrl ) {
@@ -168,7 +164,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, names);
-        //adapter.setDropDownViewResource(android.R.layout.simple_spinner_);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
         this.spinner.setAdapter(adapter);
     }
@@ -199,23 +195,16 @@ public class MainActivity extends AppCompatActivity {
         }
    }
 
-    public static class WifiReceiver extends BroadcastReceiver {
-
-        public MainActivity mainActivity;
+    public class WifiReceiver extends BroadcastReceiver {
 
         @Override
         public void onReceive(Context context, Intent intent) {
-            ConnectivityManager conMan = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
-             try {
-                NetworkInfo netInfo = conMan.getActiveNetworkInfo();
-                if (netInfo != null && netInfo.getType() == ConnectivityManager.TYPE_WIFI) {
-                    ma.wifiGoesOn();
-                } else {
-                    ma.wifiGoesOff();
-                }
-            }
-            catch (NullPointerException npe) {
-                ma.wifiGoesOff();
+            NetworkInfo info = intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
+            NetworkInfo.State connected = info.getState();
+            if (connected == NetworkInfo.State.CONNECTED) {
+                MainActivity.this.wifiGoesOn();
+            } else if (connected == NetworkInfo.State.DISCONNECTED) {
+                MainActivity.this.wifiGoesOff();
             }
         }
     };
